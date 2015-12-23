@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/quipo/statsd/event"
+	"github.com/Unix4ever/statsd/event"
 )
 
 // request to close the buffered statsd collector
