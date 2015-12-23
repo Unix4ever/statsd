@@ -3,12 +3,11 @@ package statsd
 import (
 	"fmt"
 	"log"
-	"net"
 	"os"
 	"strings"
 	"time"
 
-	"github.com/quipo/statsd/event"
+	"github.com/Unix4ever/statsd/event"
 )
 
 // Logger interface compatible with log.Logger
@@ -28,21 +27,24 @@ func init() {
 
 // StatsdClient is a client library to send events to StatsD
 type StatsdClient struct {
-	conn   net.Conn
 	addr   string
 	prefix string
 	Logger Logger
+	sink   *StatsdSink
 }
 
 // NewStatsdClient - Factory
-func NewStatsdClient(addr string, prefix string) *StatsdClient {
+func NewStatsdClient(addr string, prefix string, maxPacketSize int, flushInterval time.Duration) *StatsdClient {
 	// allow %HOST% in the prefix string
 	prefix = strings.Replace(prefix, "%HOST%", Hostname, 1)
-	return &StatsdClient{
+	client := &StatsdClient{
 		addr:   addr,
 		prefix: prefix,
 		Logger: log.New(os.Stdout, "[StatsdClient] ", log.Ldate|log.Ltime),
+		sink:   NewStatsdSink(addr, maxPacketSize, flushInterval),
 	}
+
+	return client
 }
 
 // String returns the StatsD server address
@@ -52,20 +54,13 @@ func (c *StatsdClient) String() string {
 
 // CreateSocket creates a UDP connection to a StatsD server
 func (c *StatsdClient) CreateSocket() error {
-	conn, err := net.DialTimeout("udp", c.addr, 5*time.Second)
-	if err != nil {
-		return err
-	}
-	c.conn = conn
 	return nil
 }
 
 // Close the UDP connection
 func (c *StatsdClient) Close() error {
-	if nil == c.conn {
-		return nil
-	}
-	return c.conn.Close()
+	c.sink.Shutdown()
+	return nil
 }
 
 // See statsd data types here: http://statsd.readthedocs.org/en/latest/types.html
@@ -156,26 +151,20 @@ func (c *StatsdClient) Total(stat string, value int64) error {
 
 // write a UDP packet with the statsd event
 func (c *StatsdClient) send(stat string, format string, value interface{}) error {
-	if c.conn == nil {
-		return fmt.Errorf("not connected")
-	}
 	stat = strings.Replace(stat, "%HOST%", Hostname, 1)
 	format = fmt.Sprintf("%s%s:%s", c.prefix, stat, format)
-	_, err := fmt.Fprintf(c.conn, format, value)
-	return err
+	metricValue := fmt.Sprintf(format, value)
+
+	c.sink.PushMetric(metricValue)
+	return nil
 }
 
 // SendEvent - Sends stats from an event object
 func (c *StatsdClient) SendEvent(e event.Event) error {
-	if c.conn == nil {
-		return fmt.Errorf("cannot send stats, not connected to StatsD server")
-	}
 	for _, stat := range e.Stats() {
 		//fmt.Printf("SENDING EVENT %s%s\n", c.prefix, stat)
-		_, err := fmt.Fprintf(c.conn, "%s%s", c.prefix, stat)
-		if nil != err {
-			return err
-		}
+
+		c.sink.PushMetric(fmt.Sprintf("%s%s", c.prefix, stat))
 	}
 	return nil
 }

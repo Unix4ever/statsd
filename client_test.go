@@ -6,6 +6,7 @@ import (
 	"os"
 	"reflect"
 	"regexp"
+	"time"
 	"strconv"
 	"strings"
 	"testing"
@@ -29,7 +30,7 @@ func TestTotal(t *testing.T) {
 
 	prefix := "myproject."
 
-	client := NewStatsdClient(udpAddr.String(), prefix)
+	client := NewStatsdClient(udpAddr.String(), prefix, 1024, time.Second * 1)
 
 	ch := make(chan string, 0)
 
