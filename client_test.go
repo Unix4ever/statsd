@@ -1,15 +1,14 @@
 package statsd
 
 import (
-	"fmt"
 	"net"
 	"os"
 	"reflect"
 	"regexp"
-	"time"
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 )
 
 func newLocalListenerUDP(t *testing.T) (*net.UDPConn, *net.UDPAddr) {
@@ -30,7 +29,7 @@ func TestTotal(t *testing.T) {
 
 	prefix := "myproject."
 
-	client := NewStatsdClient(udpAddr.String(), prefix, 1024, time.Second * 1)
+	client := NewStatsdClient(udpAddr.String(), prefix, 100, time.Second)
 
 	ch := make(chan string, 0)
 
@@ -70,7 +69,6 @@ func TestTotal(t *testing.T) {
 	for i := len(s); i > 0; i-- {
 		x := <-ch
 		x = strings.TrimSpace(x)
-		//fmt.Println(x)
 		if !strings.HasPrefix(x, prefix) {
 			t.Errorf("Metric without expected prefix: expected '%s', actual '%s'", prefix, x)
 		}
@@ -92,19 +90,14 @@ func TestTotal(t *testing.T) {
 
 func doListenUDP(conn *net.UDPConn, ch chan string, n int) {
 	for n > 0 {
-		// Handle the connection in a new goroutine.
-		// The loop then returns to accepting, so that
-		// multiple connections may be served concurrently.
-		go func(c *net.UDPConn, ch chan string) {
-			buffer := make([]byte, 1024)
-			size, err := c.Read(buffer)
-			// size, address, err := sock.ReadFrom(buffer) <- This starts printing empty and nil values below immediatly
-			if err != nil {
-				fmt.Println(string(buffer), size, err)
-				panic(err)
-			}
-			ch <- string(buffer)
-		}(conn, ch)
-		n--
+		buffer := make([]byte, 1400)
+		size, err := conn.Read(buffer)
+		if err != nil {
+			panic(err)
+		}
+		for _, msg := range strings.Split(string(buffer[:size]), "\n") {
+			ch <- msg
+			n--
+		}
 	}
 }

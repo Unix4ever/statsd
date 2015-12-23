@@ -1,7 +1,7 @@
 package statsd
 
 import (
-	"bytes"	
+	"bytes"
 	"log"
 	"net"
 	"time"
@@ -77,6 +77,10 @@ CONNECT:
 					log.Printf("[ERR] Error writing to statsd! Err: %s", err)
 					goto WAIT
 				}
+			}
+
+			if buf.Len() > 0 {
+				buf.WriteByte('\n')
 			}
 
 			// Append to the buffer
