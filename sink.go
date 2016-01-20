@@ -50,9 +50,10 @@ func (s *StatsdSink) flushMetrics() {
 	var sock net.Conn
 	var err error
 	var wait <-chan time.Time
-	var lastConnectTime time.Time
 	ticker := time.NewTicker(s.flushInterval)
+	reconnectTicker := time.NewTicker(s.reconnectInterval)
 	defer ticker.Stop()
+	defer reconnectTicker.Stop()
 
 CONNECT:
 	// Create a buffer
@@ -65,8 +66,6 @@ RECONNECT:
 		log.Printf("[ERR] Error connecting to statsd! Err: %s", err)
 		goto WAIT
 	}
-
-	lastConnectTime = time.Now().UTC()
 
 	for {
 		select {
@@ -92,11 +91,6 @@ RECONNECT:
 
 			// Append to the buffer
 			buf.WriteString(metric)
-
-			if s.reconnectInterval != 0 && time.Since(lastConnectTime) >= s.reconnectInterval {
-				log.Printf("Reconnecting to statsd")
-				goto RECONNECT
-			}
 		case <-ticker.C:
 			if buf.Len() == 0 {
 				continue
@@ -108,6 +102,9 @@ RECONNECT:
 				log.Printf("[ERR] Error flushing to statsd! Err: %s", err)
 				goto WAIT
 			}
+		case <-reconnectTicker.C:
+			log.Printf("Reconnecting to statsd")
+			goto RECONNECT
 		}
 	}
 
