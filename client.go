@@ -34,14 +34,15 @@ type StatsdClient struct {
 }
 
 // NewStatsdClient - Factory
-func NewStatsdClient(addr string, prefix string, maxPacketSize int, flushInterval time.Duration) *StatsdClient {
+func NewStatsdClient(addr string, prefix string, maxPacketSize int, flushInterval time.Duration,
+	reconnectInterval time.Duration) *StatsdClient {
 	// allow %HOST% in the prefix string
 	prefix = strings.Replace(prefix, "%HOST%", Hostname, 1)
 	client := &StatsdClient{
 		addr:   addr,
 		prefix: prefix,
 		Logger: log.New(os.Stdout, "[StatsdClient] ", log.Ldate|log.Ltime),
-		sink:   NewStatsdSink(addr, maxPacketSize, flushInterval),
+		sink:   NewStatsdSink(addr, maxPacketSize, flushInterval, reconnectInterval),
 	}
 
 	return client

@@ -11,19 +11,22 @@ import (
 // with a statsite or statsd metrics server. It uses
 // only UDP packets, while StatsiteSink uses TCP.
 type StatsdSink struct {
-	addr          string
-	metricQueue   chan string
-	statsdMaxLen  int
-	flushInterval time.Duration
+	addr              string
+	metricQueue       chan string
+	statsdMaxLen      int
+	flushInterval     time.Duration
+	reconnectInterval time.Duration
 }
 
 // NewStatsdSink is used to create a new StatsdSink
-func NewStatsdSink(addr string, statsdMaxLen int, flushInterval time.Duration) *StatsdSink {
+func NewStatsdSink(addr string, statsdMaxLen int, flushInterval time.Duration,
+	reconnectInterval *time.Duration) *StatsdSink {
 	s := &StatsdSink{
-		addr:          addr,
-		metricQueue:   make(chan string, 4096),
-		statsdMaxLen:  statsdMaxLen,
-		flushInterval: flushInterval,
+		addr:              addr,
+		metricQueue:       make(chan string, 4096),
+		statsdMaxLen:      statsdMaxLen,
+		flushInterval:     flushInterval,
+		reconnectInterval: reconnectInterval,
 	}
 	go s.flushMetrics()
 	return s
@@ -54,12 +57,15 @@ CONNECT:
 	// Create a buffer
 	buf := bytes.NewBuffer(nil)
 
+RECONNECT:
 	// Attempt to connect
 	sock, err = net.Dial("udp", s.addr)
 	if err != nil {
 		log.Printf("[ERR] Error connecting to statsd! Err: %s", err)
 		goto WAIT
 	}
+
+	lastConnectTime := time.Now().UTC()
 
 	for {
 		select {
@@ -86,6 +92,10 @@ CONNECT:
 			// Append to the buffer
 			buf.WriteString(metric)
 
+			if s.reconnectInterval != 0 && time.Since(lastConnectTime) >= s.reconnectInterval {
+				log.Printf("Reconnecting to statsd")
+				goto RECONNECT
+			}
 		case <-ticker.C:
 			if buf.Len() == 0 {
 				continue
