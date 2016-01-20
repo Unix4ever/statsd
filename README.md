@@ -1,5 +1,7 @@
 # StatsD client (Golang)
 
+Fork of quipo/statsd with some enhancements.
+
 [![GoDoc](https://godoc.org/github.com/quipo/statsd?status.png)](http://godoc.org/github.com/quipo/statsd)
 
 ## Introduction
@@ -11,7 +13,7 @@ This client library was inspired by the one embedded in the [Bit.ly NSQ](https:/
 
 ## Installation
 
-    go get github.com/quipo/statsd
+    go get github.com/Unix4ever/statsd
 
 ## Supported event types
 
@@ -31,13 +33,17 @@ package main
 import (
     "time"
 
-	"github.com/quipo/statsd"
+	"github.com/Unix4ever/statsd"
 )
 
 func main() {
 	// init
 	prefix := "myproject."
-	statsdclient := statsd.NewStatsdClient("localhost:8125", prefix)
+	packetSize := 1400 // limit packets size to 1400 bytes
+	flushInterval := time.Second * 30 // flush metrics batches every 30 seconds
+	reconnectTimeout := time.Minute * 5 // reconnect to statsd every 5 minutes
+                                      // setting to 0 will disable reconnects
+	statsdclient := statsd.NewStatsdClient("localhost:8125", prefix, packetSize, flushInterval, reconnectTimeout)
 	statsdclient.CreateSocket()
 	interval := time.Second * 2 // aggregate stats and flush every 2 seconds
 	stats := statsd.NewStatsdBuffer(interval, statsdclient)

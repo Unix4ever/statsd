@@ -20,7 +20,7 @@ type StatsdSink struct {
 
 // NewStatsdSink is used to create a new StatsdSink
 func NewStatsdSink(addr string, statsdMaxLen int, flushInterval time.Duration,
-	reconnectInterval *time.Duration) *StatsdSink {
+	reconnectInterval time.Duration) *StatsdSink {
 	s := &StatsdSink{
 		addr:              addr,
 		metricQueue:       make(chan string, 4096),
@@ -50,6 +50,7 @@ func (s *StatsdSink) flushMetrics() {
 	var sock net.Conn
 	var err error
 	var wait <-chan time.Time
+	var lastConnectTime time.Time
 	ticker := time.NewTicker(s.flushInterval)
 	defer ticker.Stop()
 
@@ -65,7 +66,7 @@ RECONNECT:
 		goto WAIT
 	}
 
-	lastConnectTime := time.Now().UTC()
+	lastConnectTime = time.Now().UTC()
 
 	for {
 		select {
